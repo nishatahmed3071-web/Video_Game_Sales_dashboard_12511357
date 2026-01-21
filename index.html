@@ -88,6 +88,54 @@
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
+
+        .reset-button {
+            padding: 10px 25px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+        }
+
+        .reset-button:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
+
+        .reset-button:active {
+            transform: translateY(0);
+        }
+
+        .selection-indicator {
+            background: #667eea;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            display: inline-block;
+            margin: 5px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .selections-display {
+            background: #e8eaf6;
+            padding: 15px;
+            border-bottom: 2px solid #e0e0e0;
+            text-align: center;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
         
         .stats-bar {
             display: flex;
@@ -130,6 +178,7 @@
             padding: 15px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
         }
         
         .chart-container:hover {
@@ -144,6 +193,13 @@
             margin-bottom: 10px;
             padding-bottom: 10px;
             border-bottom: 2px solid #667eea;
+        }
+
+        .chart-subtitle {
+            font-size: 0.85em;
+            color: #666;
+            font-style: italic;
+            margin-top: 5px;
         }
         
         .loading {
@@ -169,14 +225,14 @@
         
         <div class="controls-panel">
             <div class="control-group">
-                <label for="genreFilter">🎯 Genre</label>
+                <label for="genreFilter">🎯 Genre Filter</label>
                 <select id="genreFilter">
                     <option value="All">All Genres</option>
                 </select>
             </div>
             
             <div class="control-group">
-                <label for="platformFilter">🎮 Platform</label>
+                <label for="platformFilter">🎮 Platform Filter</label>
                 <select id="platformFilter">
                     <option value="All">All Platforms</option>
                 </select>
@@ -187,6 +243,12 @@
                 <input type="range" id="yearRange" min="1980" max="2020" value="2020" style="width: 200px;">
                 <span id="yearDisplay" style="font-weight: bold; color: #667eea;">1980 - 2020</span>
             </div>
+
+            <button class="reset-button" id="resetButton">🔄 Reset All Selections</button>
+        </div>
+
+        <div class="selections-display" id="selectionsDisplay">
+            <span style="color: #666; font-style: italic;">Click on any chart to filter data. Global filters above apply to all views.</span>
         </div>
         
         <div class="stats-bar">
@@ -211,21 +273,25 @@
         <div class="charts-grid">
             <div class="chart-container">
                 <div class="chart-title">📊 Sales by Region</div>
+                <div class="chart-subtitle">Click a region to filter by strong sales in that area</div>
                 <div id="regionalChart"></div>
             </div>
             
             <div class="chart-container">
                 <div class="chart-title">📈 Sales Trend Over Time</div>
+                <div class="chart-subtitle">Click a year to filter data for that specific year</div>
                 <div id="trendChart"></div>
             </div>
             
             <div class="chart-container">
                 <div class="chart-title">🎯 Top 10 Genres by Sales</div>
+                <div class="chart-subtitle">Click a genre bar to focus on that genre</div>
                 <div id="genreChart"></div>
             </div>
             
             <div class="chart-container">
                 <div class="chart-title">🎮 Platform Market Share</div>
+                <div class="chart-subtitle">Click a platform slice to filter by that platform</div>
                 <div id="platformChart"></div>
             </div>
         </div>
@@ -234,6 +300,12 @@
     <script>
         let globalData = [];
         let filteredData = [];
+        let brushSelections = {
+            region: null,
+            year: null,
+            genre: null,
+            platform: null
+        };
 
         // Load CSV data from GitHub
         function loadCSVData() {
@@ -340,17 +412,43 @@
             });
         }
 
+        // Update selection display
+        function updateSelectionDisplay() {
+            const display = document.getElementById('selectionsDisplay');
+            let html = '';
+            
+            if (brushSelections.region) {
+                html += `<span class="selection-indicator">📍 Region: ${brushSelections.region}</span>`;
+            }
+            if (brushSelections.year) {
+                html += `<span class="selection-indicator">📅 Year: ${brushSelections.year}</span>`;
+            }
+            if (brushSelections.genre) {
+                html += `<span class="selection-indicator">🎯 Genre: ${brushSelections.genre}</span>`;
+            }
+            if (brushSelections.platform) {
+                html += `<span class="selection-indicator">🎮 Platform: ${brushSelections.platform}</span>`;
+            }
+            
+            if (html === '') {
+                html = '<span style="color: #666; font-style: italic;">Click on any chart to filter data. Global filters above apply to all views.</span>';
+            }
+            
+            display.innerHTML = html;
+        }
+
         // Update statistics
         function updateStats(data) {
             const totalGames = data.length;
             const totalSales = data.reduce((sum, d) => sum + d.Global_Sales, 0);
-            const avgSales = totalSales / totalGames;
+            const avgSales = totalGames > 0 ? totalSales / totalGames : 0;
             
             const genreSales = {};
             data.forEach(d => {
                 genreSales[d.Genre] = (genreSales[d.Genre] || 0) + d.Global_Sales;
             });
-            const topGenre = Object.keys(genreSales).reduce((a, b) => genreSales[a] > genreSales[b] ? a : b);
+            const topGenre = Object.keys(genreSales).length > 0 ? 
+                Object.keys(genreSales).reduce((a, b) => genreSales[a] > genreSales[b] ? a : b) : 'N/A';
             
             document.getElementById('totalGames').textContent = totalGames;
             document.getElementById('totalSales').textContent = totalSales.toFixed(1);
@@ -370,7 +468,12 @@
                 y: [naSales, euSales, jpSales, otherSales],
                 type: 'bar',
                 marker: {
-                    color: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A']
+                    color: ['North America', 'Europe', 'Japan', 'Other'].map(r => 
+                        brushSelections.region === r ? '#667eea' : 
+                        (r === 'North America' ? '#FF6B6B' : 
+                         r === 'Europe' ? '#4ECDC4' : 
+                         r === 'Japan' ? '#45B7D1' : '#FFA07A')
+                    )
                 },
                 text: [naSales.toFixed(1), euSales.toFixed(1), jpSales.toFixed(1), otherSales.toFixed(1)],
                 textposition: 'outside'
@@ -403,7 +506,10 @@
                 type: 'scatter',
                 mode: 'lines+markers',
                 line: { color: '#667eea', width: 3 },
-                marker: { size: 6 },
+                marker: { 
+                    size: years.map(y => brushSelections.year && brushSelections.year.toString() === y ? 12 : 6),
+                    color: years.map(y => brushSelections.year && brushSelections.year.toString() === y ? '#ff6b6b' : '#667eea')
+                },
                 fill: 'tozeroy',
                 fillcolor: 'rgba(102, 126, 234, 0.2)'
             };
@@ -436,7 +542,9 @@
                 type: 'bar',
                 orientation: 'h',
                 marker: {
-                    color: sorted.map((_, i) => `hsl(${i * 36}, 70%, 60%)`)
+                    color: sorted.map((d, i) => 
+                        brushSelections.genre === d[0] ? '#667eea' : `hsl(${i * 36}, 70%, 60%)`
+                    )
                 },
                 text: sorted.map(d => d[1].toFixed(1)),
                 textposition: 'outside'
@@ -469,7 +577,9 @@
                 type: 'pie',
                 hole: 0.4,
                 marker: {
-                    colors: sorted.map((_, i) => `hsl(${i * 36}, 70%, 60%)`)
+                    colors: sorted.map((d, i) => 
+                        brushSelections.platform === d[0] ? '#667eea' : `hsl(${i * 36}, 70%, 60%)`
+                    )
                 },
                 textinfo: 'label+percent',
                 textposition: 'outside'
@@ -484,6 +594,50 @@
             Plotly.newPlot('platformChart', [trace], layout, {responsive: true});
         }
 
+        // Apply all filters (global + brush selections)
+        function applyAllFilters() {
+            const genre = document.getElementById('genreFilter').value;
+            const platform = document.getElementById('platformFilter').value;
+            const maxYear = parseInt(document.getElementById('yearRange').value);
+            
+            filteredData = globalData.filter(d => {
+                // Global filters
+                let passesGlobal = (genre === 'All' || d.Genre === genre) &&
+                                   (platform === 'All' || d.Platform === platform) &&
+                                   d.Year_of_Release <= maxYear;
+                
+                if (!passesGlobal) return false;
+                
+                // Brush selections
+                if (brushSelections.region) {
+                    const regionMap = {
+                        'North America': 'NA_Sales',
+                        'Europe': 'EU_Sales',
+                        'Japan': 'JP_Sales',
+                        'Other': 'Other_Sales'
+                    };
+                    const regionField = regionMap[brushSelections.region];
+                    if (d[regionField] <= 0.5) return false;
+                }
+                
+                if (brushSelections.year && d.Year_of_Release !== brushSelections.year) {
+                    return false;
+                }
+                
+                if (brushSelections.genre && d.Genre !== brushSelections.genre) {
+                    return false;
+                }
+                
+                if (brushSelections.platform && d.Platform !== brushSelections.platform) {
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            updateDashboard();
+        }
+
         // Update all visualizations
         function updateDashboard() {
             updateStats(filteredData);
@@ -491,46 +645,77 @@
             updateTrendChart(filteredData);
             updateGenreChart(filteredData);
             updatePlatformChart(filteredData);
+            updateSelectionDisplay();
         }
 
-        // Filter data
-        function filterData() {
-            const genre = document.getElementById('genreFilter').value;
-            const platform = document.getElementById('platformFilter').value;
-            const maxYear = parseInt(document.getElementById('yearRange').value);
-            
-            filteredData = globalData.filter(d => {
-                return (genre === 'All' || d.Genre === genre) &&
-                       (platform === 'All' || d.Platform === platform) &&
-                       d.Year_of_Release <= maxYear;
-            });
-            
-            updateDashboard();
-        }
-
-        // Event listeners
-        document.getElementById('genreFilter').addEventListener('change', filterData);
-        document.getElementById('platformFilter').addEventListener('change', filterData);
+        // Event listeners for global filters
+        document.getElementById('genreFilter').addEventListener('change', applyAllFilters);
+        document.getElementById('platformFilter').addEventListener('change', applyAllFilters);
         document.getElementById('yearRange').addEventListener('input', function() {
             const minYear = document.getElementById('yearRange').min;
             document.getElementById('yearDisplay').textContent = `${minYear} - ${this.value}`;
-            filterData();
+            applyAllFilters();
         });
 
-        // Add click event for brushing & linking
+        // Reset button
+        document.getElementById('resetButton').addEventListener('click', function() {
+            brushSelections = {
+                region: null,
+                year: null,
+                genre: null,
+                platform: null
+            };
+            document.getElementById('genreFilter').value = 'All';
+            document.getElementById('platformFilter').value = 'All';
+            const yearRange = document.getElementById('yearRange');
+            yearRange.value = yearRange.max;
+            const minYear = yearRange.min;
+            document.getElementById('yearDisplay').textContent = `${minYear} - ${yearRange.max}`;
+            applyAllFilters();
+        });
+
+        // Brushing & Linking: Regional Chart
         document.getElementById('regionalChart').on('plotly_click', function(data) {
             const region = data.points[0].x;
-            const regionMap = {
-                'North America': 'NA_Sales',
-                'Europe': 'EU_Sales',
-                'Japan': 'JP_Sales',
-                'Other': 'Other_Sales'
-            };
-            
-            // Filter to show only games with significant sales in clicked region
-            const regionField = regionMap[region];
-            filteredData = globalData.filter(d => d[regionField] > 0.5);
-            updateDashboard();
+            if (brushSelections.region === region) {
+                brushSelections.region = null; // Toggle off
+            } else {
+                brushSelections.region = region;
+            }
+            applyAllFilters();
+        });
+
+        // Brushing & Linking: Trend Chart
+        document.getElementById('trendChart').on('plotly_click', function(data) {
+            const year = parseInt(data.points[0].x);
+            if (brushSelections.year === year) {
+                brushSelections.year = null; // Toggle off
+            } else {
+                brushSelections.year = year;
+            }
+            applyAllFilters();
+        });
+
+        // Brushing & Linking: Genre Chart
+        document.getElementById('genreChart').on('plotly_click', function(data) {
+            const genre = data.points[0].y;
+            if (brushSelections.genre === genre) {
+                brushSelections.genre = null; // Toggle off
+            } else {
+                brushSelections.genre = genre;
+            }
+            applyAllFilters();
+        });
+
+        // Brushing & Linking: Platform Chart
+        document.getElementById('platformChart').on('plotly_click', function(data) {
+            const platform = data.points[0].label;
+            if (brushSelections.platform === platform) {
+                brushSelections.platform = null; // Toggle off
+            } else {
+                brushSelections.platform = platform;
+            }
+            applyAllFilters();
         });
     </script>
 </body>
