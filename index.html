@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Game Sales Analytics Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .dashboard-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .dashboard-header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .dashboard-header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .controls-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 2px solid #e0e0e0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .control-group label {
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9em;
+        }
+        
+        .control-group select, .control-group input {
+            padding: 8px 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+            min-width: 150px;
+            transition: border-color 0.3s;
+        }
+        
+        .control-group select:hover, .control-group input:hover {
+            border-color: #667eea;
+        }
+        
+        .control-group select:focus, .control-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 20px;
+            background: #f0f0f0;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .stat-card {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            min-width: 150px;
+        }
+        
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card p {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .chart-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.5em;
+            color: #667eea;
+        }
+        
+        @media (max-width: 1200px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <h1>🎮 Video Game Sales Analytics Dashboard</h1>
+            <p>Interactive exploration of global video game market trends and insights</p>
+        </div>
+        
+        <div class="controls-panel">
+            <div class="control-group">
+                <label for="genreFilter">🎯 Genre</label>
+                <select id="genreFilter">
+                    <option value="All">All Genres</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="platformFilter">🎮 Platform</label>
+                <select id="platformFilter">
+                    <option value="All">All Platforms</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="yearRange">📅 Year Range</label>
+                <input type="range" id="yearRange" min="1980" max="2020" value="2020" style="width: 200px;">
+                <span id="yearDisplay" style="font-weight: bold; color: #667eea;">1980 - 2020</span>
+            </div>
+        </div>
+        
+        <div class="stats-bar">
+            <div class="stat-card">
+                <h3 id="totalGames">-</h3>
+                <p>Total Games</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="totalSales">-</h3>
+                <p>Global Sales (M)</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="avgSales">-</h3>
+                <p>Avg Sales (M)</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="topGenre">-</h3>
+                <p>Top Genre</p>
+            </div>
+        </div>
+        
+        <div class="charts-grid">
+            <div class="chart-container">
+                <div class="chart-title">📊 Sales by Region</div>
+                <div id="regionalChart"></div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">📈 Sales Trend Over Time</div>
+                <div id="trendChart"></div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">🎯 Top 10 Genres by Sales</div>
+                <div id="genreChart"></div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">🎮 Platform Market Share</div>
+                <div id="platformChart"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let globalData = [];
+        let filteredData = [];
+
+        // Sample data generation (replace with CSV loading)
+        function generateSampleData() {
+            const genres = ['Action', 'Sports', 'Shooter', 'Role-Playing', 'Platform', 'Racing', 'Fighting', 'Simulation', 'Puzzle', 'Adventure'];
+            const platforms = ['PS2', 'X360', 'PS3', 'Wii', 'DS', 'PS', 'GBA', 'PS4', 'XOne', 'PC'];
+            const data = [];
+            
+            for (let i = 0; i < 500; i++) {
+                const year = Math.floor(Math.random() * 35) + 1985;
+                const naSales = Math.random() * 5;
+                const euSales = Math.random() * 3;
+                const jpSales = Math.random() * 2;
+                const otherSales = Math.random() * 1;
+                
+                data.push({
+                    Name: `Game ${i}`,
+                    Platform: platforms[Math.floor(Math.random() * platforms.length)],
+                    Year_of_Release: year,
+                    Genre: genres[Math.floor(Math.random() * genres.length)],
+                    NA_Sales: naSales,
+                    EU_Sales: euSales,
+                    JP_Sales: jpSales,
+                    Other_Sales: otherSales,
+                    Global_Sales: naSales + euSales + jpSales + otherSales
+                });
+            }
+            
+            return data;
+        }
+
+        // Initialize with sample data
+        globalData = generateSampleData();
+        filteredData = [...globalData];
+
+        // Populate filters
+        function populateFilters() {
+            const genres = [...new Set(globalData.map(d => d.Genre))].sort();
+            const platforms = [...new Set(globalData.map(d => d.Platform))].sort();
+            
+            const genreSelect = document.getElementById('genreFilter');
+            const platformSelect = document.getElementById('platformFilter');
+            
+            genres.forEach(genre => {
+                const option = document.createElement('option');
+                option.value = genre;
+                option.textContent = genre;
+                genreSelect.appendChild(option);
+            });
+            
+            platforms.forEach(platform => {
+                const option = document.createElement('option');
+                option.value = platform;
+                option.textContent = platform;
+                platformSelect.appendChild(option);
+            });
+        }
+
+        // Update statistics
+        function updateStats(data) {
+            const totalGames = data.length;
+            const totalSales = data.reduce((sum, d) => sum + d.Global_Sales, 0);
+            const avgSales = totalSales / totalGames;
+            
+            const genreSales = {};
+            data.forEach(d => {
+                genreSales[d.Genre] = (genreSales[d.Genre] || 0) + d.Global_Sales;
+            });
+            const topGenre = Object.keys(genreSales).reduce((a, b) => genreSales[a] > genreSales[b] ? a : b);
+            
+            document.getElementById('totalGames').textContent = totalGames;
+            document.getElementById('totalSales').textContent = totalSales.toFixed(1);
+            document.getElementById('avgSales').textContent = avgSales.toFixed(2);
+            document.getElementById('topGenre').textContent = topGenre;
+        }
+
+        // Chart 1: Regional Sales
+        function updateRegionalChart(data) {
+            const naSales = data.reduce((sum, d) => sum + d.NA_Sales, 0);
+            const euSales = data.reduce((sum, d) => sum + d.EU_Sales, 0);
+            const jpSales = data.reduce((sum, d) => sum + d.JP_Sales, 0);
+            const otherSales = data.reduce((sum, d) => sum + d.Other_Sales, 0);
+            
+            const trace = {
+                x: ['North America', 'Europe', 'Japan', 'Other'],
+                y: [naSales, euSales, jpSales, otherSales],
+                type: 'bar',
+                marker: {
+                    color: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A']
+                },
+                text: [naSales.toFixed(1), euSales.toFixed(1), jpSales.toFixed(1), otherSales.toFixed(1)],
+                textposition: 'outside'
+            };
+            
+            const layout = {
+                margin: { t: 20, b: 40, l: 50, r: 20 },
+                height: 300,
+                yaxis: { title: 'Sales (Millions)' },
+                showlegend: false
+            };
+            
+            Plotly.newPlot('regionalChart', [trace], layout, {responsive: true});
+        }
+
+        // Chart 2: Sales Trend Over Time
+        function updateTrendChart(data) {
+            const salesByYear = {};
+            data.forEach(d => {
+                const year = d.Year_of_Release;
+                salesByYear[year] = (salesByYear[year] || 0) + d.Global_Sales;
+            });
+            
+            const years = Object.keys(salesByYear).sort();
+            const sales = years.map(y => salesByYear[y]);
+            
+            const trace = {
+                x: years,
+                y: sales,
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: { color: '#667eea', width: 3 },
+                marker: { size: 6 },
+                fill: 'tozeroy',
+                fillcolor: 'rgba(102, 126, 234, 0.2)'
+            };
+            
+            const layout = {
+                margin: { t: 20, b: 40, l: 50, r: 20 },
+                height: 300,
+                xaxis: { title: 'Year' },
+                yaxis: { title: 'Global Sales (Millions)' },
+                showlegend: false
+            };
+            
+            Plotly.newPlot('trendChart', [trace], layout, {responsive: true});
+        }
+
+        // Chart 3: Genre Sales
+        function updateGenreChart(data) {
+            const genreSales = {};
+            data.forEach(d => {
+                genreSales[d.Genre] = (genreSales[d.Genre] || 0) + d.Global_Sales;
+            });
+            
+            const sorted = Object.entries(genreSales)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            
+            const trace = {
+                x: sorted.map(d => d[1]),
+                y: sorted.map(d => d[0]),
+                type: 'bar',
+                orientation: 'h',
+                marker: {
+                    color: sorted.map((_, i) => `hsl(${i * 36}, 70%, 60%)`)
+                },
+                text: sorted.map(d => d[1].toFixed(1)),
+                textposition: 'outside'
+            };
+            
+            const layout = {
+                margin: { t: 20, b: 40, l: 100, r: 50 },
+                height: 300,
+                xaxis: { title: 'Global Sales (Millions)' },
+                showlegend: false
+            };
+            
+            Plotly.newPlot('genreChart', [trace], layout, {responsive: true});
+        }
+
+        // Chart 4: Platform Market Share
+        function updatePlatformChart(data) {
+            const platformSales = {};
+            data.forEach(d => {
+                platformSales[d.Platform] = (platformSales[d.Platform] || 0) + d.Global_Sales;
+            });
+            
+            const sorted = Object.entries(platformSales)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            
+            const trace = {
+                labels: sorted.map(d => d[0]),
+                values: sorted.map(d => d[1]),
+                type: 'pie',
+                hole: 0.4,
+                marker: {
+                    colors: sorted.map((_, i) => `hsl(${i * 36}, 70%, 60%)`)
+                },
+                textinfo: 'label+percent',
+                textposition: 'outside'
+            };
+            
+            const layout = {
+                margin: { t: 20, b: 20, l: 20, r: 20 },
+                height: 300,
+                showlegend: false
+            };
+            
+            Plotly.newPlot('platformChart', [trace], layout, {responsive: true});
+        }
+
+        // Update all visualizations
+        function updateDashboard() {
+            updateStats(filteredData);
+            updateRegionalChart(filteredData);
+            updateTrendChart(filteredData);
+            updateGenreChart(filteredData);
+            updatePlatformChart(filteredData);
+        }
+
+        // Filter data
+        function filterData() {
+            const genre = document.getElementById('genreFilter').value;
+            const platform = document.getElementById('platformFilter').value;
+            const maxYear = parseInt(document.getElementById('yearRange').value);
+            
+            filteredData = globalData.filter(d => {
+                return (genre === 'All' || d.Genre === genre) &&
+                       (platform === 'All' || d.Platform === platform) &&
+                       d.Year_of_Release <= maxYear;
+            });
+            
+            updateDashboard();
+        }
+
+        // Event listeners
+        document.getElementById('genreFilter').addEventListener('change', filterData);
+        document.getElementById('platformFilter').addEventListener('change', filterData);
+        document.getElementById('yearRange').addEventListener('input', function() {
+            document.getElementById('yearDisplay').textContent = `1980 - ${this.value}`;
+            filterData();
+        });
+
+        // Initialize dashboard
+        populateFilters();
+        updateDashboard();
+
+        // Add click event for brushing & linking
+        document.getElementById('regionalChart').on('plotly_click', function(data) {
+            const region = data.points[0].x;
+            const regionMap = {
+                'North America': 'NA_Sales',
+                'Europe': 'EU_Sales',
+                'Japan': 'JP_Sales',
+                'Other': 'Other_Sales'
+            };
+            
+            // Filter to show only games with significant sales in clicked region
+            const regionField = regionMap[region];
+            filteredData = globalData.filter(d => d[regionField] > 0.5);
+            updateDashboard();
+        });
+    </script>
+</body>
+</html>
