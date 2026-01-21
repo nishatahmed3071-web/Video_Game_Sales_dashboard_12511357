@@ -248,7 +248,7 @@
         </div>
 
         <div class="selections-display" id="selectionsDisplay">
-            <span style="color: #666; font-style: italic;">Click on any chart to filter data. Global filters above apply to all views.</span>
+            <!-- Selection indicators will appear here when filters are active -->
         </div>
         
         <div class="stats-bar">
@@ -430,10 +430,7 @@
                 html += `<span class="selection-indicator">🎮 Platform: ${brushSelections.platform}</span>`;
             }
             
-            if (html === '') {
-                html = '<span style="color: #666; font-style: italic;">Click on any chart to filter data. Global filters above apply to all views.</span>';
-            }
-            
+            // When no filters are active, the display will be empty
             display.innerHTML = html;
         }
 
